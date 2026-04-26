@@ -11,6 +11,7 @@ import '@xyflow/react/dist/style.css';
 import { Link } from 'react-router-dom';
 import { getInteractions } from '../lib/api';
 import { CustomNode } from '../components/CustomNode';
+import type { ServerStatus } from '../App';
 
 const nodeTypes = { custom: CustomNode };
 
@@ -24,21 +25,41 @@ const DOMAIN_COLORS: Record<string, string> = {
   general: '#94a3b8',
 };
 
+interface GraphPageProps {
+  serverStatus: ServerStatus;
+  secondsRemaining: number;
+  wakeUrl: string;
+}
+
 function getDomainColor(domain: string): string {
   const lower = (domain || 'general').toLowerCase();
   return DOMAIN_COLORS[lower] ?? DOMAIN_COLORS.general;
 }
 
-export function GraphPage() {
+function formatWakeTime(secondsRemaining: number): string {
+  const minutes = Math.floor(secondsRemaining / 60);
+  const seconds = secondsRemaining % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+export function GraphPage({ serverStatus, secondsRemaining, wakeUrl }: GraphPageProps) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const wakeInProgress = serverStatus === 'waking' || serverStatus === 'offline';
 
   useEffect(() => {
+    if (serverStatus !== 'online') {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     getInteractions()
       .then(setItems)
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [serverStatus]);
 
   const { nodes, edges } = useMemo(() => {
     if (!items.length) return { nodes: [] as Node[], edges: [] as Edge[] };
@@ -63,7 +84,6 @@ export function GraphPage() {
       };
     });
 
-    // Build edges — connect items that share domain or have keyword overlap
     const graphEdges: Edge[] = [];
     for (let i = 0; i < graphNodes.length; i++) {
       for (let j = i + 1; j < graphNodes.length; j++) {
@@ -73,13 +93,11 @@ export function GraphPage() {
         let related = false;
         let label = '';
 
-        // Same domain
         if (a.domain === b.domain) {
           related = true;
           label = a.domain;
         }
 
-        // Keyword overlap 
         if (!related) {
           const aWords = new Set((a.task || '').toLowerCase().split(/\s+/));
           const bWords = (b.task || '').toLowerCase().split(/\s+/);
@@ -104,7 +122,6 @@ export function GraphPage() {
       }
     }
 
-    // Fallback: connect sequential nodes if no edges
     if (graphEdges.length === 0 && graphNodes.length > 1) {
       for (let i = 0; i < graphNodes.length - 1; i++) {
         graphEdges.push({
@@ -131,7 +148,6 @@ export function GraphPage() {
 
   return (
     <div className="h-screen w-full flex flex-col">
-      {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-200 bg-white/80 backdrop-blur-lg px-6 py-4">
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg">
@@ -147,7 +163,6 @@ export function GraphPage() {
           </div>
         </div>
 
-        {/* Domain Legend */}
         <div className="hidden md:flex items-center gap-3">
           {domains.map((d) => (
             <div key={d} className="flex items-center gap-1.5">
@@ -165,48 +180,65 @@ export function GraphPage() {
         </Link>
       </div>
 
-      {/* Graph */}
       <div className="flex-1 relative">
-        {loading ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-3">
-              <svg className="h-8 w-8 animate-spin text-sky-500" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              <span className="text-xs text-slate-500">Loading interactions…</span>
-            </div>
-          </div>
-        ) : nodes.length === 0 ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center glass-card max-w-sm">
-              <div className="text-4xl mb-3">🕸️</div>
-              <h2 className="text-sm font-semibold text-slate-800 mb-2">No interactions yet</h2>
-              <p className="text-xs text-slate-500 mb-4">
-                Process some prompts on the Engine page to see your interaction graph here.
+        {wakeInProgress && (
+          <div className="server-overlay">
+            <div className="server-overlay-card">
+              <div className="badge badge-amber">Render Free Tier Wake-Up</div>
+              <h2 className="mt-4 text-2xl font-semibold text-slate-900">Graph is waiting for the backend</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                The interaction graph depends on stored backend records. As soon as Render wakes up, this page will refresh automatically.
               </p>
-              <Link to="/" className="btn-primary text-xs">Go to Engine</Link>
+              <div className="server-countdown mt-5">{formatWakeTime(secondsRemaining)}</div>
+              <a className="btn-primary mt-6" href={wakeUrl} target="_blank" rel="noreferrer">
+                Wake Server Link
+              </a>
             </div>
           </div>
-        ) : (
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            fitView
-            proOptions={{ hideAttribution: true }}
-          >
-            <MiniMap
-              nodeColor={(node) => {
-                const d = node.data as { color?: string };
-                return d?.color ?? '#475569';
-              }}
-              style={{ background: 'rgba(255,255,255,0.95)' }}
-            />
-            <Controls />
-            <Background color="#cbd5e1" gap={24} size={1} />
-          </ReactFlow>
         )}
+
+        <div className={wakeInProgress ? 'app-shell-muted h-full' : 'h-full'}>
+          {loading ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <svg className="h-8 w-8 animate-spin text-sky-500" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <span className="text-xs text-slate-500">Loading interactions...</span>
+              </div>
+            </div>
+          ) : nodes.length === 0 ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center glass-card max-w-sm">
+                <div className="text-4xl mb-3">Graph</div>
+                <h2 className="text-sm font-semibold text-slate-800 mb-2">No interactions yet</h2>
+                <p className="text-xs text-slate-500 mb-4">
+                  Process some prompts on the Engine page to see your interaction graph here.
+                </p>
+                <Link to="/" className="btn-primary text-xs">Go to Engine</Link>
+              </div>
+            </div>
+          ) : (
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              fitView
+              proOptions={{ hideAttribution: true }}
+            >
+              <MiniMap
+                nodeColor={(node) => {
+                  const d = node.data as { color?: string };
+                  return d?.color ?? '#475569';
+                }}
+                style={{ background: 'rgba(255,255,255,0.95)' }}
+              />
+              <Controls />
+              <Background color="#cbd5e1" gap={24} size={1} />
+            </ReactFlow>
+          )}
+        </div>
       </div>
     </div>
   );

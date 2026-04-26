@@ -256,6 +256,32 @@ body {
     height: 1px;
     background: linear-gradient(90deg, transparent, rgba(15, 23, 42, 0.12), transparent);
   }
+
+  .app-shell-muted {
+    filter: blur(8px) saturate(0.85);
+    opacity: 0.4;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .server-overlay {
+    @apply absolute inset-0 z-20 flex items-center justify-center px-4;
+    background: linear-gradient(180deg, rgba(246, 248, 252, 0.58), rgba(246, 248, 252, 0.82));
+  }
+
+  .server-overlay-card {
+    @apply w-full max-w-xl rounded-[28px] p-8 text-center;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(14, 165, 233, 0.18);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.14);
+  }
+
+  .server-countdown {
+    @apply text-5xl font-semibold tracking-tight text-slate-900;
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 /* ─── React Flow overrides ─── */

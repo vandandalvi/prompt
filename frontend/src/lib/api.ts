@@ -1,6 +1,18 @@
 import type { OptimizationMode, PipelineResponse } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
+export const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
+
+export async function checkServerHealth(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/health`, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
 
 export async function processInput(payload: {
   raw_input: string;

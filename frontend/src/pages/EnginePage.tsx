@@ -9,8 +9,15 @@ import { TokenStats } from '../components/TokenStats';
 import { WhatChangedPanel } from '../components/WhatChangedPanel';
 import { DecisionLogs } from '../components/DecisionLogs';
 import { MemoryPanel } from '../components/MemoryPanel';
+import type { ServerStatus } from '../App';
 
 const MEMORY_KEY = 'prompt_engine_memory_v1';
+
+interface EnginePageProps {
+  serverStatus: ServerStatus;
+  secondsRemaining: number;
+  wakeUrl: string;
+}
 
 function loadMemory(): MemoryEntry[] {
   try {
@@ -27,8 +34,13 @@ function persistMemory(entries: MemoryEntry[]) {
   localStorage.setItem(MEMORY_KEY, JSON.stringify(entries.slice(0, 5)));
 }
 
-export function EnginePage() {
-  // ─── State ───
+function formatWakeTime(secondsRemaining: number): string {
+  const minutes = Math.floor(secondsRemaining / 60);
+  const seconds = secondsRemaining % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+export function EnginePage({ serverStatus, secondsRemaining, wakeUrl }: EnginePageProps) {
   const [mode, setMode] = useState<OptimizationMode>('balanced');
   const [inputText, setInputText] = useState('');
   const [transcript, setTranscript] = useState('');
@@ -44,12 +56,19 @@ export function EnginePage() {
   const [memorySaved, setMemorySaved] = useState(false);
   const [memorySkipped, setMemorySkipped] = useState(false);
 
+  const serverReady = serverStatus === 'online';
+  const wakeInProgress = serverStatus === 'waking' || serverStatus === 'offline';
+
   useEffect(() => {
     setMemory(loadMemory());
   }, []);
 
-  // ─── Pipeline ───
   async function optimizePrompt() {
+    if (!serverReady) {
+      setError('Server is waking up. Please wait for the countdown to finish and the status to switch on.');
+      return;
+    }
+
     setError(null);
     setProcessing(true);
     setConfirmed(false);
@@ -81,7 +100,6 @@ export function EnginePage() {
     }
   }
 
-  // ─── Memory ───
   async function handleSaveMemory() {
     if (!result) return;
 
@@ -125,89 +143,110 @@ export function EnginePage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header mode={mode} onModeChange={setMode} />
+      <Header
+        mode={mode}
+        onModeChange={setMode}
+        serverStatus={serverStatus}
+        secondsRemaining={secondsRemaining}
+      />
 
-      <main className="flex-1 grid grid-cols-1 gap-5 p-5 xl:grid-cols-3 max-w-[1920px] mx-auto w-full">
-        {/* ═══ Left Column ═══ */}
-        <section className="space-y-5">
-          <VoicePanel
-            inputText={inputText}
-            onInputChange={setInputText}
-            transcript={transcript}
-            onTranscriptChange={setTranscript}
-            confidence={confidence}
-            onConfidenceChange={setConfidence}
-            sttSource={sttSource}
-            onSttSourceChange={setSttSource}
-            onError={setError}
-            onLog={addLog}
-          />
+      <main className="relative flex-1 max-w-[1920px] mx-auto w-full">
+        {wakeInProgress && (
+          <div className="server-overlay">
+            <div className="server-overlay-card">
+              <div className="badge badge-amber">Render Free Tier Wake-Up</div>
+              <h2 className="mt-4 text-2xl font-semibold text-slate-900">Server is waking up</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                The backend is asleep on Render free tier. We are pinging it now, and the app will unlock automatically when the server responds.
+              </p>
+              <div className="server-countdown mt-5">{formatWakeTime(secondsRemaining)}</div>
+              <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
+                Estimated time until access returns
+              </p>
+              <a className="btn-primary mt-6" href={wakeUrl} target="_blank" rel="noreferrer">
+                Wake Server Link
+              </a>
+            </div>
+          </div>
+        )}
 
-          {/* Memory panel on left at xl */}
-          <div className="hidden xl:block">
-            <MemoryPanel
-              result={result}
-              memory={memory}
-              onSave={handleSaveMemory}
-              onSkip={handleSkipMemory}
-              saved={memorySaved}
-              skipped={memorySkipped}
+        <div className={`grid grid-cols-1 gap-5 p-5 xl:grid-cols-3 ${wakeInProgress ? 'app-shell-muted' : ''}`}>
+          <section className="space-y-5">
+            <VoicePanel
+              inputText={inputText}
+              onInputChange={setInputText}
+              transcript={transcript}
+              onTranscriptChange={setTranscript}
+              confidence={confidence}
+              onConfidenceChange={setConfidence}
+              sttSource={sttSource}
+              onSttSourceChange={setSttSource}
+              onError={setError}
+              onLog={addLog}
             />
-          </div>
-        </section>
 
-        {/* ═══ Center Column ═══ */}
-        <section className="space-y-5">
-          <AnalysisPanel
-            result={result}
-            confidence={confidence}
-            sttSource={sttSource}
-            mode={mode}
-            inputText={inputText}
-            processing={processing}
-            error={error}
-            confirmed={confirmed}
-            highAccuracy={highAccuracy}
-            onHighAccuracyChange={setHighAccuracy}
-            onRunPipeline={optimizePrompt}
-            onConfirm={() => setConfirmed(true)}
-            onRework={handleRework}
-          />
-        </section>
+            <div className="hidden xl:block">
+              <MemoryPanel
+                result={result}
+                memory={memory}
+                onSave={handleSaveMemory}
+                onSkip={handleSkipMemory}
+                saved={memorySaved}
+                skipped={memorySkipped}
+              />
+            </div>
+          </section>
 
-        {/* ═══ Right Column ═══ */}
-        <section className="space-y-5">
-          <div className="glass-card animate-slide-up" style={{ animationDelay: '0.15s' }}>
-            <div className="panel-title">Output &amp; Diagnostics</div>
-
-            <ResultPanel result={result} confirmed={confirmed} />
-
-            <div className="divider" />
-            <TokenStats result={result} />
-
-            {result && (
-              <>
-                <div className="divider" />
-                <WhatChangedPanel result={result} />
-
-                <div className="divider" />
-                <DecisionLogs logs={sessionLogs} />
-              </>
-            )}
-          </div>
-
-          {/* Memory panel visible on smaller screens */}
-          <div className="xl:hidden">
-            <MemoryPanel
+          <section className="space-y-5">
+            <AnalysisPanel
               result={result}
-              memory={memory}
-              onSave={handleSaveMemory}
-              onSkip={handleSkipMemory}
-              saved={memorySaved}
-              skipped={memorySkipped}
+              confidence={confidence}
+              sttSource={sttSource}
+              mode={mode}
+              inputText={inputText}
+              processing={processing}
+              error={error}
+              confirmed={confirmed}
+              highAccuracy={highAccuracy}
+              onHighAccuracyChange={setHighAccuracy}
+              onRunPipeline={optimizePrompt}
+              onConfirm={() => setConfirmed(true)}
+              onRework={handleRework}
             />
-          </div>
-        </section>
+          </section>
+
+          <section className="space-y-5">
+            <div className="glass-card animate-slide-up" style={{ animationDelay: '0.15s' }}>
+              <div className="panel-title">Output &amp; Diagnostics</div>
+
+              <ResultPanel result={result} confirmed={confirmed} />
+
+              <div className="divider" />
+              <TokenStats result={result} />
+
+              {result && (
+                <>
+                  <div className="divider" />
+                  <WhatChangedPanel result={result} />
+
+                  <div className="divider" />
+                  <DecisionLogs logs={sessionLogs} />
+                </>
+              )}
+            </div>
+
+            <div className="xl:hidden">
+              <MemoryPanel
+                result={result}
+                memory={memory}
+                onSave={handleSaveMemory}
+                onSkip={handleSkipMemory}
+                saved={memorySaved}
+                skipped={memorySkipped}
+              />
+            </div>
+          </section>
+        </div>
       </main>
     </div>
   );

@@ -1,9 +1,12 @@
 import { Link } from 'react-router-dom';
 import type { OptimizationMode } from '../types';
+import type { ServerStatus } from '../App';
 
 interface HeaderProps {
   mode: OptimizationMode;
   onModeChange: (mode: OptimizationMode) => void;
+  serverStatus: ServerStatus;
+  secondsRemaining: number;
 }
 
 const MODES: { key: OptimizationMode; label: string; desc: string }[] = [
@@ -12,8 +15,28 @@ const MODES: { key: OptimizationMode; label: string; desc: string }[] = [
   { key: 'strict', label: 'Strict', desc: 'Keywords only' },
 ];
 
-export function Header({ mode, onModeChange }: HeaderProps) {
+function formatWakeTime(secondsRemaining: number): string {
+  const minutes = Math.floor(secondsRemaining / 60);
+  const seconds = secondsRemaining % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+export function Header({ mode, onModeChange, serverStatus, secondsRemaining }: HeaderProps) {
   const activeIndex = MODES.findIndex((m) => m.key === mode);
+  const statusClass =
+    serverStatus === 'online'
+      ? 'badge-emerald'
+      : serverStatus === 'checking'
+        ? 'badge-violet'
+        : 'badge-amber';
+  const statusLabel =
+    serverStatus === 'online'
+      ? 'Server is On'
+      : serverStatus === 'checking'
+        ? 'Checking server'
+        : serverStatus === 'waking'
+          ? `Server waking ${formatWakeTime(secondsRemaining)}`
+          : 'Server is Off';
 
   return (
     <header className="relative border-b border-slate-200/80 backdrop-blur-lg bg-white/80">
@@ -55,17 +78,20 @@ export function Header({ mode, onModeChange }: HeaderProps) {
           ))}
         </div>
 
-        {/* Nav */}
-        <Link
-          to="/graph"
-          id="nav-graph"
-          className="btn-ghost text-xs"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-          </svg>
-          Graph
-        </Link>
+        <div className="flex items-center gap-3">
+          <span className={`badge ${statusClass}`}>{statusLabel}</span>
+
+          <Link
+            to="/graph"
+            id="nav-graph"
+            className="btn-ghost text-xs"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
+            Graph
+          </Link>
+        </div>
       </div>
     </header>
   );
