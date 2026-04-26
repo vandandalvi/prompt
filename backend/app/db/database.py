@@ -16,9 +16,14 @@ def _resolve_sqlite_path(database_url: str) -> Path:
     if not database_url.startswith("sqlite:///"):
         raise ValueError("Only sqlite:/// DATABASE_URL values are currently supported.")
 
+    raw_path = database_url.removeprefix("sqlite:///")
     parsed = urlparse(database_url)
-    raw_path = parsed.path or database_url.removeprefix("sqlite:///")
-    path = Path(raw_path)
+
+    # Preserve SQLAlchemy-style relative SQLite paths like sqlite:///./prompt_engine.db.
+    if raw_path.startswith("./") or raw_path.startswith("../"):
+        path = Path(raw_path)
+    else:
+        path = Path(parsed.path or raw_path)
 
     if path.is_absolute():
         return path
