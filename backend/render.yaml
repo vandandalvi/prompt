@@ -1,18 +1,24 @@
 services:
   - type: web
     name: prompt-engine-backend
+    rootDir: backend
     runtime: python
     region: singapore
     plan: free
     buildCommand: pip install -r requirements.txt && python init_db.py
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: GEMINI_API_KEY
         sync: false          # set manually in Render dashboard
+      - key: GEMINI_API_KEYS
+        sync: false          # optional comma-separated fallback keys
       - key: SARVAM_API_KEY
         sync: false          # set manually in Render dashboard
       - key: FRONTEND_ORIGIN
         sync: false          # set to your Vercel URL after deploy
+      - key: CORS_ORIGINS
+        sync: false          # optional extra origins, comma-separated
       - key: DATABASE_URL
         value: sqlite:///./prompt_engine.db
       - key: PYTHON_VERSION

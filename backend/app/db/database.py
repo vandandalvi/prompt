@@ -4,16 +4,44 @@ import json
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
+from urllib.parse import urlparse
+
+from app.config import settings
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-DB_PATH = BASE_DIR / "prompt_engine.db"
+SCHEMA_PATH = BASE_DIR / "schema.sql"
+
+
+def _resolve_sqlite_path(database_url: str) -> Path:
+    if not database_url.startswith("sqlite:///"):
+        raise ValueError("Only sqlite:/// DATABASE_URL values are currently supported.")
+
+    parsed = urlparse(database_url)
+    raw_path = parsed.path or database_url.removeprefix("sqlite:///")
+    path = Path(raw_path)
+
+    if path.is_absolute():
+        return path
+
+    return (BASE_DIR / path).resolve()
+
+
+DB_PATH = _resolve_sqlite_path(settings.database_url)
+
+
+def _initialize_schema(conn: sqlite3.Connection) -> None:
+    schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
+    conn.executescript(schema_sql)
+    conn.commit()
 
 
 @contextmanager
 def get_conn():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     try:
+        _initialize_schema(conn)
         yield conn
     finally:
         conn.close()

@@ -337,6 +337,67 @@ copy .env.example .env
 npm run dev
 ```
 
+## Deployment
+
+This repo is structured as a small monorepo:
+
+- `backend/` deploy to Render
+- `frontend/` deploy to Vercel
+
+### Render backend
+
+Recommended service settings:
+
+- Service type: `Web Service`
+- Root directory: `backend`
+- Build command: `pip install -r requirements.txt && python init_db.py`
+- Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Health check path: `/health`
+
+Required environment variables:
+
+- `GEMINI_API_KEY=<your primary Gemini key>`
+- `SARVAM_API_KEY=<your Sarvam key>`
+- `FRONTEND_ORIGIN=https://<your-vercel-app>.vercel.app`
+
+Optional environment variables:
+
+- `GEMINI_API_KEYS=key1,key2,key3`
+- `CORS_ORIGINS=https://<your-vercel-app>.vercel.app,https://<custom-domain>`
+- `DATABASE_URL=sqlite:///./prompt_engine.db`
+
+Notes:
+
+- `backend/render.yaml` includes a Render Blueprint-ready config.
+- The backend now respects `DATABASE_URL` for SQLite deployments.
+- SQLite is fine for demos and small personal use, but not ideal for multi-instance production scaling.
+
+### Vercel frontend
+
+Recommended project settings:
+
+- Framework preset: `Vite`
+- Root directory: `frontend`
+- Build command: `npm run build`
+- Output directory: `dist`
+
+Required environment variable:
+
+- `VITE_API_BASE=https://<your-render-service>.onrender.com`
+
+Notes:
+
+- `frontend/vercel.json` already includes SPA rewrite handling.
+- After deployment, update Render `FRONTEND_ORIGIN` to the final Vercel URL.
+
+### Suggested deploy order
+
+1. Deploy the backend on Render.
+2. Copy the Render service URL.
+3. Deploy the frontend on Vercel with `VITE_API_BASE` pointing to that Render URL.
+4. Update Render `FRONTEND_ORIGIN` to the final Vercel domain.
+5. Re-deploy the backend if Render does not auto-apply the env change.
+
 ## Example input/output
 
 ### Example input (Hinglish voice transcript)
@@ -384,3 +445,4 @@ npm run dev
 - Set `GEMINI_API_KEY` and `SARVAM_API_KEY` in backend `.env` for production behavior.
 - You can configure Gemini key fallback with `GEMINI_API_KEYS=key1,key2,key3` (comma-separated). If one key hits quota/rate limits, the backend automatically retries with the next key.
 - If Gemini key is missing, deterministic fallback extraction is used.
+- The current frontend voice experience uses browser speech recognition only. The backend Sarvam STT endpoint exists, but a browser upload flow is still needed for a true frontend fallback path.

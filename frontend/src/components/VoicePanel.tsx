@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { sarvamTranslate } from '../lib/api';
 
 interface VoicePanelProps {
   inputText: string;
@@ -27,11 +26,8 @@ export function VoicePanel({
   onLog,
 }: VoicePanelProps) {
   const [recording, setRecording] = useState(false);
-  const [sarvamLoading, setSarvamLoading] = useState(false);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
 
   const canUseSpeech = useMemo(
     () => Boolean(window.SpeechRecognition || window.webkitSpeechRecognition),
@@ -42,9 +38,6 @@ export function VoicePanel({
   useEffect(() => {
     return () => {
       recognitionRef.current?.stop();
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
-      }
     };
   }, []);
 
@@ -105,15 +98,6 @@ export function VoicePanel({
     onLog('Recording stopped');
   }
 
-  async function runSarvamSTT() {
-    // Disabled as requested
-    onLog('Sarvam STT is disabled. Using browser STT only.');
-  }
-
-  const handleManualTranslate = () => {
-    // if(!sarvamLoading) runSarvamSTT();
-  };
-
   return (
     <div className="glass-card space-y-4">
       <div className="panel-title">
@@ -148,15 +132,6 @@ export function VoicePanel({
           Stop
         </button>
 
-        {sarvamLoading && (
-          <span className="badge-cyan badge animate-pulse text-xs">
-            <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Sarvam Translating…
-          </span>
-        )}
       </div>
 
       {/* Textarea */}
@@ -191,7 +166,7 @@ export function VoicePanel({
 
       {!canUseSpeech && (
         <p className="mt-3 text-xs text-amber-700">
-          ⚠ Browser Speech API unavailable. Sarvam AI will be used for voice input.
+          Browser Speech API is unavailable in this browser. Type input manually or add a frontend Sarvam upload flow before relying on voice in production.
         </p>
       )}
     </div>
