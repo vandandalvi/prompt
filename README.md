@@ -350,6 +350,7 @@ Recommended service settings:
 
 - Service type: `Web Service`
 - Root directory: `backend`
+- Python version: `3.11.11`
 - Build command: `pip install -r requirements.txt && python init_db.py`
 - Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 - Health check path: `/health`
@@ -369,6 +370,7 @@ Optional environment variables:
 Notes:
 
 - `backend/render.yaml` includes a Render Blueprint-ready config.
+- `backend/.python-version` pins Render to Python `3.11.11`, which avoids `tiktoken` build failures seen on Python `3.14`.
 - The backend now respects `DATABASE_URL` for SQLite deployments.
 - SQLite is fine for demos and small personal use, but not ideal for multi-instance production scaling.
 
