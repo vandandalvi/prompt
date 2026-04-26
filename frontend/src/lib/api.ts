@@ -2,11 +2,12 @@ import type { OptimizationMode, PipelineResponse } from '../types';
 
 export const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
 
-export async function checkServerHealth(): Promise<boolean> {
+export async function checkServerHealth(signal?: AbortSignal): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/health`, {
       method: 'GET',
       cache: 'no-store',
+      signal,
     });
     return res.ok;
   } catch {

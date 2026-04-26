@@ -11,7 +11,7 @@ import '@xyflow/react/dist/style.css';
 import { Link } from 'react-router-dom';
 import { getInteractions } from '../lib/api';
 import { CustomNode } from '../components/CustomNode';
-import type { ServerStatus } from '../App';
+import { useServerStatus } from '../hooks/useServerStatus';
 
 const nodeTypes = { custom: CustomNode };
 
@@ -25,30 +25,18 @@ const DOMAIN_COLORS: Record<string, string> = {
   general: '#94a3b8',
 };
 
-interface GraphPageProps {
-  serverStatus: ServerStatus;
-  secondsRemaining: number;
-  wakeUrl: string;
-}
-
 function getDomainColor(domain: string): string {
   const lower = (domain || 'general').toLowerCase();
   return DOMAIN_COLORS[lower] ?? DOMAIN_COLORS.general;
 }
 
-function formatWakeTime(secondsRemaining: number): string {
-  const minutes = Math.floor(secondsRemaining / 60);
-  const seconds = secondsRemaining % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
-
-export function GraphPage({ serverStatus, secondsRemaining, wakeUrl }: GraphPageProps) {
+export function GraphPage() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const wakeInProgress = serverStatus === 'waking' || serverStatus === 'offline';
+  const { isReady } = useServerStatus();
 
   useEffect(() => {
-    if (serverStatus !== 'online') {
+    if (!isReady) {
       setItems([]);
       setLoading(false);
       return;
@@ -59,7 +47,7 @@ export function GraphPage({ serverStatus, secondsRemaining, wakeUrl }: GraphPage
       .then(setItems)
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
-  }, [serverStatus]);
+  }, [isReady]);
 
   const { nodes, edges } = useMemo(() => {
     if (!items.length) return { nodes: [] as Node[], edges: [] as Edge[] };
@@ -181,64 +169,46 @@ export function GraphPage({ serverStatus, secondsRemaining, wakeUrl }: GraphPage
       </div>
 
       <div className="flex-1 relative">
-        {wakeInProgress && (
-          <div className="server-overlay">
-            <div className="server-overlay-card">
-              <div className="badge badge-amber">Render Free Tier Wake-Up</div>
-              <h2 className="mt-4 text-2xl font-semibold text-slate-900">Graph is waiting for the backend</h2>
-              <p className="mt-2 text-sm text-slate-600">
-                The interaction graph depends on stored backend records. As soon as Render wakes up, this page will refresh automatically.
-              </p>
-              <div className="server-countdown mt-5">{formatWakeTime(secondsRemaining)}</div>
-              <a className="btn-primary mt-6" href={wakeUrl} target="_blank" rel="noreferrer">
-                Wake Server Link
-              </a>
+        {loading ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <svg className="h-8 w-8 animate-spin text-sky-500" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <span className="text-xs text-slate-500">Loading interactions...</span>
             </div>
           </div>
+        ) : nodes.length === 0 ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center glass-card max-w-sm">
+              <div className="text-4xl mb-3">Graph</div>
+              <h2 className="text-sm font-semibold text-slate-800 mb-2">No interactions yet</h2>
+              <p className="text-xs text-slate-500 mb-4">
+                Process some prompts on the Engine page to see your interaction graph here.
+              </p>
+              <Link to="/" className="btn-primary text-xs">Go to Engine</Link>
+            </div>
+          </div>
+        ) : (
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            fitView
+            proOptions={{ hideAttribution: true }}
+          >
+            <MiniMap
+              nodeColor={(node) => {
+                const d = node.data as { color?: string };
+                return d?.color ?? '#475569';
+              }}
+              style={{ background: 'rgba(255,255,255,0.95)' }}
+            />
+            <Controls />
+            <Background color="#cbd5e1" gap={24} size={1} />
+          </ReactFlow>
         )}
-
-        <div className={wakeInProgress ? 'app-shell-muted h-full' : 'h-full'}>
-          {loading ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="flex flex-col items-center gap-3">
-                <svg className="h-8 w-8 animate-spin text-sky-500" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                <span className="text-xs text-slate-500">Loading interactions...</span>
-              </div>
-            </div>
-          ) : nodes.length === 0 ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center glass-card max-w-sm">
-                <div className="text-4xl mb-3">Graph</div>
-                <h2 className="text-sm font-semibold text-slate-800 mb-2">No interactions yet</h2>
-                <p className="text-xs text-slate-500 mb-4">
-                  Process some prompts on the Engine page to see your interaction graph here.
-                </p>
-                <Link to="/" className="btn-primary text-xs">Go to Engine</Link>
-              </div>
-            </div>
-          ) : (
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              nodeTypes={nodeTypes}
-              fitView
-              proOptions={{ hideAttribution: true }}
-            >
-              <MiniMap
-                nodeColor={(node) => {
-                  const d = node.data as { color?: string };
-                  return d?.color ?? '#475569';
-                }}
-                style={{ background: 'rgba(255,255,255,0.95)' }}
-              />
-              <Controls />
-              <Background color="#cbd5e1" gap={24} size={1} />
-            </ReactFlow>
-          )}
-        </div>
       </div>
     </div>
   );
