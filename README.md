@@ -444,7 +444,7 @@ Notes:
 
 ## Notes
 
-- Set `GEMINI_API_KEY` and `SARVAM_API_KEY` in backend `.env` for production behavior.
+- Set `G_KEY` and `SARVAM_API_KEY` in backend `.env` for production behavior.
 - You can configure Gemini key fallback with `GEMINI_API_KEYS=key1,key2,key3` (comma-separated). If one key hits quota/rate limits, the backend automatically retries with the next key.
 - If Gemini key is missing, deterministic fallback extraction is used.
 - The current frontend voice experience uses browser speech recognition only. The backend Sarvam STT endpoint exists, but a browser upload flow is still needed for a true frontend fallback path.
